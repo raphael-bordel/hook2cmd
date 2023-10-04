@@ -1,0 +1,26 @@
+# Webhook : example of a Webhook URL in GitLab/GitHub https://www.cresi.fr:3000/test
+# generate token : openssl rand -base64 32
+# secret_token is unique for an instance of the server, so for a config file
+bindto: "0.0.0.0:3000"
+https: true
+certfile: "/home/debian/fullchain.pem"
+keyfile: "/home/debian/privkey.pem"
+secret_token: "PVAfCf73k2G3XXnDP2qXNjnbh843DE/QVUYivoDzy6w="
+email_from: "webhooklog@toto.com"
+email_password: "azerty!6"
+email_smtpHost: "aaa.toto.com"
+email_smtpPort: "587"
+
+projets:
+  - route: /projet-dev
+    nom: hook2cmd
+    command: "/home/debian/script/build-dev.sh" 
+    log_to_email: "raphael.bordel@xxx.com,toto@titi.com"
+  - route: /test
+    nom: projet
+    command: "/home/debian/script/test.sh"
+    log_to_email: "raphael.bordel@xxx.com"
+  - route: /projet-prod
+    nom: hook2cmd
+    command: "/home/debian/script/build-prod.sh"
+    log_to_email: "toto@titi.com"
