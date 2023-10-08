@@ -142,7 +142,7 @@ func traite(route string) {
 }
 
 func runcommand(lp Projet) {
-	cmd := exec.Command(lp.Command)
+	cmd := exec.Command(lp.Command, lp.Name)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Println("cmd.Run() failed with ", err)
