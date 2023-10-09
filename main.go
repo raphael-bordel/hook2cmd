@@ -82,37 +82,30 @@ func chargeconfig() bool {
 func hookHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("\n%s\n", r.Header) //r.RequestURI)
-	// on cherche la signature de Gitlab
-	header_token1 := r.Header.Get("X-Gitlab-Token")
-	if header_token1 != "" { // GITLAB
+	
+	if header_token1 := r.Header.Get("X-Gitlab-Token"); header_token1 != "" { // on cherche la signature de Gitlab
 		if header_token1 != yamlConfig.SecretToken {
 			http.Error(w, "Error : GitLab Token Verification Failed\n", 490)
 			return
 		}
 		// GitLab Token : OK
-	} else { // on cherche la signature de GitHub
-		header_token2 := r.Header.Get("X-Hub-Signature-256")
-		if header_token2 != "" { // GITHUB
-			payload, _ := ioutil.ReadAll(r.Body)
-			if SignedBy(header_token2, payload) != true {
-				http.Error(w, "Error : GitLab Token Verification Failed\n", 491)
-				return
-			}
-			// GitHub Token : OK
-		} else {
-			// exemple usage : curl -H "X-Hook2CMD-Token: PVAfCf73k2G3XXnDP2qXNjnbh843DE/QVUYivoDzy6w=" -X POST https://www.cresi.fr:3000/test
-			header_token3 := r.Header.Get("X-Hook2CMD-Token")
-			if header_token3 != "" { // Hook2Cmd : POST
-				if header_token3 != yamlConfig.SecretToken {
-					http.Error(w, "Error : Hook2CMD Token Verification Failed\n", 492)
-					return
-				}
-				// Hook2Cmd : POST : OK
-			} else {
-			    http.Error(w, "Error : Unidentified WebHook request\n", 497)
-			    return
-			}
+	} else if header_token2 := r.Header.Get("X-Hub-Signature-256"); header_token2 != "" { // on cherche la signature de GitHub
+		payload, _ := ioutil.ReadAll(r.Body)
+		if SignedBy(header_token2, payload) != true {
+			http.Error(w, "Error : GitLab Token Verification Failed\n", 491)
+			return
 		}
+		// GitHub Token : OK
+	} else if header_token3 := r.Header.Get("X-Hook2CMD-Token"); header_token3 != "" {  // on cherche notre signature
+  		// exemple usage : curl -H "X-Hook2CMD-Token: PVAfCf73k2G3XXnDP2qXNjnbh843DE/QVUYivoDzy6w=" -X POST https://www.cresi.fr:3000/test
+		if header_token3 != yamlConfig.SecretToken {
+			http.Error(w, "Error : Hook2CMD Token Verification Failed\n", 492)
+			return
+		}
+		// Hook2Cmd : POST : OK
+	} else {
+		http.Error(w, "Error : Unidentified WebHook request\n", 497)
+		return
 	}
 	http.Error(w, "ok\n", 200)
 
@@ -206,6 +199,6 @@ func SignedBy(signature string, payload []byte) bool {
 		return false
 	} else {
 		calcule := SignBody(yamlConfig.SecretToken, payload)
-	    return hmac.Equal(calcule, actual)
+		return hmac.Equal(calcule, actual)
 	}
 }
