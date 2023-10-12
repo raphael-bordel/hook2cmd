@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -85,6 +86,7 @@ func hookHandler(w http.ResponseWriter, r *http.Request) {
 	
 	if header_token1 := r.Header.Get("X-Gitlab-Token"); header_token1 != "" { // on cherche la signature de Gitlab
 		if header_token1 != yamlConfig.SecretToken {
+			time.Sleep(8 * time.Second)  // wait 8 sec
 			http.Error(w, "Error : GitLab Token Verification Failed\n", 490)
 			return
 		}
@@ -92,6 +94,7 @@ func hookHandler(w http.ResponseWriter, r *http.Request) {
 	} else if header_token2 := r.Header.Get("X-Hub-Signature-256"); header_token2 != "" { // on cherche la signature de GitHub
 		payload, _ := ioutil.ReadAll(r.Body)
 		if SignedBy(header_token2, payload) != true {
+			time.Sleep(8 * time.Second)  // wait 8 sec
 			http.Error(w, "Error : GitHub Token Verification Failed\n", 491)
 			return
 		}
@@ -99,11 +102,13 @@ func hookHandler(w http.ResponseWriter, r *http.Request) {
 	} else if header_token3 := r.Header.Get("X-Hook2CMD-Token"); header_token3 != "" {  // on cherche notre signature
   		// exemple usage : curl -H "X-Hook2CMD-Token: PVAfCf73k2G3XXnDP2qXNjnbh843DE/QVUYivoDzy6w=" -X POST https://www.cresi.fr:3000/test
 		if header_token3 != yamlConfig.SecretToken {
+			time.Sleep(8 * time.Second)  // wait 8 sec
 			http.Error(w, "Error : Hook2CMD Token Verification Failed\n", 492)
 			return
 		}
 		// Hook2Cmd : POST : OK
 	} else {
+		time.Sleep(8 * time.Second)  // wait 8 sec
 		http.Error(w, "Error : Unidentified WebHook request\n", 497)
 		return
 	}
