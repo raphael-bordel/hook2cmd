@@ -92,7 +92,7 @@ func hookHandler(w http.ResponseWriter, r *http.Request) {
 	} else if header_token2 := r.Header.Get("X-Hub-Signature-256"); header_token2 != "" { // on cherche la signature de GitHub
 		payload, _ := ioutil.ReadAll(r.Body)
 		if SignedBy(header_token2, payload) != true {
-			http.Error(w, "Error : GitLab Token Verification Failed\n", 491)
+			http.Error(w, "Error : GitHub Token Verification Failed\n", 491)
 			return
 		}
 		// GitHub Token : OK
