@@ -1,0 +1,26 @@
+# Copy to /etc/systemd/system or /usr/lib/systemd/system
+# cd /home/debian/hook2cmd
+# cp hook2cmd.service /etc/systemd/system/.
+# reload systemd services files 
+# systemctl daemon-reload
+# enable service
+# systemctl enable hook2cmd.service
+# systemctl is-enabled hook2cmd.service
+# systemctl start hook2cmd.service
+# journalctl -u hook2cmd.service
+#
+
+[Unit]
+Description=A Secure WebHook server to execute tasks. 
+After=network.target nss-lookup.target
+
+[Service]
+Type=exec
+User=debian
+ExecStart=/home/debian/hook2cmd/hook2cmd -f /home/debian/config.yaml
+ExecStop=/bin/pkill hook2cmd
+TimeoutStopSec=5
+Restart=on-abnormal
+
+[Install]
+WantedBy=multi-user.target

@@ -17,6 +17,7 @@ import (
 )
 
 type Config struct {
+	LogFile        string `yaml:"logfile"`
 	Bindto         string `yaml:"bindto"`
 	HTTPS          bool   `yaml:"https"`
 	CertFile       string `yaml:"certfile"`
@@ -37,10 +38,27 @@ type Projet struct {
 }
 
 var yamlConfig Config
+var H2Clog *log.Logger
 
 func main() {
 	if chargeconfig() == true {
 		var err error
+
+		// open log file
+		logFile, logerr := os.OpenFile(yamlConfig.LogFile, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0644)
+		if logerr != nil {
+			log.Fatal(logerr)
+		}
+		defer logFile.Close()
+
+		// set log output
+		//H2Clog.SetOutput(logFile)
+		H2Clog = log.New(logFile, "", 0)
+
+		// optional: log date-time, filename, and line number
+		//H2Clog.SetFlags(H2Clog.Lshortfile | H2Clog.LstdFlags)
+
+		H2Clog.Println("Hook2CMD logging started ...")
 
 		for _, uneconfig := range yamlConfig.Projets {
 			http.HandleFunc(uneconfig.Route, hookHandler)
@@ -50,7 +68,7 @@ func main() {
 		} else {
 			err = http.ListenAndServe(yamlConfig.Bindto, nil)
 		}
-		log.Fatal(err)
+		H2Clog.Fatal(err)
 	} else {
 		log.Fatal("No config file specified on command line; Please provide an existing yaml file by using -f option")
 	}
@@ -72,7 +90,7 @@ func chargeconfig() bool {
 	}
 	err1 := yaml.Unmarshal(data, &yamlConfig)
 	if err1 != nil {
-		log.Println("Format YAML incorrect pour le fichier : ", fileName)
+		H2Clog.Println("Format YAML incorrect pour le fichier : ", fileName)
 		return false
 	}
 	//fmt.Println(yamlConfig)
@@ -127,7 +145,7 @@ func traite(route string) {
 		}
 	}
 	if ok != true {
-		log.Println("pas de config/projet correspondant a cette route : ", route)
+		H2Clog.Println("pas de config/projet correspondant a cette route : ", route)
 		return
 	}
 
@@ -138,7 +156,7 @@ func runcommand(lp Projet) {
 	cmd := exec.Command(lp.Command, lp.Name)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Println("cmd.Run() failed with ", err)
+		H2Clog.Println("cmd.Run() failed with ", err)
 		return
 	}
 	fmt.Printf("combined out:\n%s\n", string(out))
@@ -169,7 +187,7 @@ func envoimail(lp Projet, message []byte) {
 	// Send actual message
 	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, dest, msg)
 	if err != nil {
-		log.Println(err)
+		H2Clog.Println(err)
 	}
 }
 

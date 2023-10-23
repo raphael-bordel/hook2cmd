@@ -1,6 +1,7 @@
 # Webhook : example of a Webhook URL in GitLab/GitHub https://www.cresi.fr:3000/test
 # generate token : openssl rand -base64 32
 # secret_token is unique for an instance of the server, so for a config file
+logfile: "/home/debian/hook2cmd.log"
 bindto: "0.0.0.0:3000"
 https: true
 certfile: "/home/debian/fullchain.pem"
