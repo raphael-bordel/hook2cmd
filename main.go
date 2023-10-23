@@ -54,10 +54,10 @@ func main() {
 
 		// set log output
 		//H2Clog.SetOutput(logFile)
-		H2Clog = log.New(logFile, "", 0)
+		H2Clog = log.New(logFile, "", log.LstdFlags)
 
 		// optional: log date-time, filename, and line number
-		//H2Clog.SetFlags(H2Clog.Lshortfile | H2Clog.LstdFlags)
+		//H2Clog.SetFlags(log.Lshortfile | log.LstdFlags)
 
 		H2Clog.Println("Hook2CMD logging started ...")
 
