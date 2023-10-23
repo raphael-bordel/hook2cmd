@@ -91,7 +91,7 @@ func chargeconfig() bool {
 	}
 	err1 := yaml.Unmarshal(data, &yamlConfig)
 	if err1 != nil {
-		H2Clog.Println("Format YAML incorrect pour le fichier : ", fileName)
+		log.Println("Format YAML incorrect pour le fichier : ", fileName)
 		return false
 	}
 	//fmt.Println(yamlConfig)
