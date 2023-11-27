@@ -38,10 +38,13 @@ type Projet struct {
 	Log2Email string `yaml:"log_to_email"`
 }
 
+// UGLY GLOBALS !!!!!!!!!!!!
+// BUT don't know how to pass arguments to HandleFunc
 var yamlConfig Config
 var H2Clog *log.Logger
 
 func main() {
+	// if YAML config file can be loaded into global variable 'yamlConfig' 
 	if chargeconfig() == true {
 		var err error
 
@@ -52,18 +55,14 @@ func main() {
 		}
 		defer logFile.Close()
 
-		// set log output
-		//H2Clog.SetOutput(logFile)
 		H2Clog = log.New(logFile, "", log.LstdFlags)
-
-		// optional: log date-time, filename, and line number
-		//H2Clog.SetFlags(log.Lshortfile | log.LstdFlags)
-
 		H2Clog.Println("Hook2CMD logging started ...")
-
+		
+		// we add a handler for each 'Route' for each 'Projets'
 		for _, uneconfig := range yamlConfig.Projets {
 			http.HandleFunc(uneconfig.Route, hookHandler)
 		}
+		// start the server
 		if yamlConfig.HTTPS == true {
 			err = http.ListenAndServeTLS(yamlConfig.Bindto, yamlConfig.CertFile, yamlConfig.KeyFile, nil)
 		} else {
@@ -75,6 +74,7 @@ func main() {
 	}
 }
 
+// parse the YAML config file given in parameter '-f config_file'
 func chargeconfig() bool {
 
 	var fileName string
@@ -98,36 +98,41 @@ func chargeconfig() bool {
 	return true
 }
 
+// handle a connection  : can handle multiple connection ; this is called as a 'go routine'
 func hookHandler(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Printf("\n%s\n", r.Header) //r.RequestURI)
+	//fmt.Printf("\n%s\n", r.Header) //r.RequestURI)
 	
-	if header_token1 := r.Header.Get("X-Gitlab-Token"); header_token1 != "" { // on cherche la signature de Gitlab
+	// we look for GITLAB signature
+	if header_token1 := r.Header.Get("X-Gitlab-Token"); header_token1 != "" { 
 		if header_token1 != yamlConfig.SecretToken {
 			time.Sleep(8 * time.Second)  // wait 8 sec
 			http.Error(w, "Error : GitLab Token Verification Failed\n", 490)
+			H2Clog.Println("Bad Token in Gitlab WebHook request")
 			return
 		}
-		// GitLab Token : OK
-	} else if header_token2 := r.Header.Get("X-Hub-Signature-256"); header_token2 != "" { // on cherche la signature de GitHub
+	// we look for GITHUB signature
+	} else if header_token2 := r.Header.Get("X-Hub-Signature-256"); header_token2 != "" { 
 		payload, _ := ioutil.ReadAll(r.Body)
 		if SignedBy(header_token2, payload) != true {
-			time.Sleep(8 * time.Second)  // wait 8 sec
+			time.Sleep(8 * time.Second)  // wait 8 sec to slow down hacking
 			http.Error(w, "Error : GitHub Token Verification Failed\n", 491)
+			H2Clog.Println("Bad Token in Github WebHook request")
 			return
 		}
-		// GitHub Token : OK
-	} else if header_token3 := r.Header.Get("X-Hook2CMD-Token"); header_token3 != "" {  // on cherche notre signature
-  		// exemple usage : curl -H "X-Hook2CMD-Token: PVAfCf73k2G3XXnDP2qXNjnbh843DE/QVUYivoDzy6w=" -X POST https://www.cresi.fr:3000/test
+	// we look for Hook2CMD signature
+	// exemple usage : curl -H "X-Hook2CMD-Token: PVAfCf73k2G3XXnDP2qXNjnbh843DE/QVUYivoDzy6w=" -X POST https://www.cresi.fr:3000/test
+	} else if header_token3 := r.Header.Get("X-Hook2CMD-Token"); header_token3 != "" { 
 		if header_token3 != yamlConfig.SecretToken {
-			time.Sleep(8 * time.Second)  // wait 8 sec
+			time.Sleep(8 * time.Second)  // wait 8 sec to slow down hacking
 			http.Error(w, "Error : Hook2CMD Token Verification Failed\n", 492)
+			H2Clog.Println("Bad Token in Hook2CMD request")
 			return
 		}
-		// Hook2Cmd : POST : OK
 	} else {
-		time.Sleep(8 * time.Second)  // wait 8 sec
+		time.Sleep(8 * time.Second)  // wait 8 sec to slow down hacking
 		http.Error(w, "Error : Unidentified WebHook request\n", 497)
+		H2Clog.Println("Unidentified WebHook request")
 		return
 	}
 	http.Error(w, "ok\n", 200)
@@ -137,6 +142,7 @@ func hookHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+// look for Projet associated with the 'Route' 
 func traite(route string) {
 
 	var uneconfig Projet
@@ -150,7 +156,7 @@ func traite(route string) {
 		}
 	}
 	if ok != true {
-		H2Clog.Println("pas de config/projet correspondant a cette route : ", route)
+		H2Clog.Println("No Projet for this Route in config file: ", route)
 		return
 	}
 
@@ -161,9 +167,10 @@ func runcommand(lp Projet) {
 	cmd := exec.Command(lp.Command, lp.Name)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		H2Clog.Println("cmd.Run() failed with ", err)
+		H2Clog.Println("cmd.CombinedOutput() failed with ", err)
 		return
 	}
+	H2Clog.Println(lp.Route, lp.Command, lp.Name)
 	fmt.Printf("combined out:\n%s\n", string(out))
 	envoimail(lp, out)
 }
@@ -176,7 +183,7 @@ func envoimail(lp Projet, message []byte) {
 	smtpHost := yamlConfig.Email_smtpHost
 	smtpPort := yamlConfig.Email_smtpPort
 	msg := []byte("To: ")
-	msg = append(msg, lp.Log2Email...) // les ... permettent d'ajouter un string à un []byte
+	msg = append(msg, lp.Log2Email...) // ... permit adding string to []byte !?!?!?
 	msg = append(msg, "\r\n"...)
 	msg = append(msg, "Subject: Output de la Route "...)
 	msg = append(msg, lp.Route...)

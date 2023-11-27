@@ -3,6 +3,8 @@
 # secret_token is unique for an instance of the server, so for a config file
 # full path of the log file
 # all the path and files should be accessible by the user by wich the server service is run 
+# exemple usage : curl -H "X-Hook2CMD-Token: PVAfCf73k2G3XXnDP2qXNjnbh843DE/QVUYivoDzy6w=" -X POST https://www.cresi.fr:3000/test
+
 logfile: "/home/debian/hook2cmd.log"
 # IP:port of the network interface to bind to
 bindto: "0.0.0.0:3000"
