@@ -33,7 +33,7 @@ type Config struct {
 }
 type Projet struct {
 	Route     string `yaml:"route"`
-	Name      string `yaml:"nom"`
+	Name      string `yaml:"name"`
 	Command   string `yaml:"command"`
 	Log2Email string `yaml:"log_to_email"`
 }
