@@ -1,6 +1,7 @@
 # Copy to /etc/systemd/system or /usr/lib/systemd/system
 # cd /home/debian/hook2cmd
 # cp hook2cmd.service /etc/systemd/system/.
+# adjust values : 'User' 'ExecStart' 'ExecStop' as needed
 # reload systemd services files 
 # systemctl daemon-reload
 # enable service
