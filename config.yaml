@@ -1,27 +1,45 @@
 # Webhook : example of a Webhook URL in GitLab/GitHub https://www.cresi.fr:3000/test
 # generate token : openssl rand -base64 32
 # secret_token is unique for an instance of the server, so for a config file
+# full path of the log file
+# all the path and files should be accessible by the user by wich the server service is run 
 logfile: "/home/debian/hook2cmd.log"
+# IP:port of the network interface to bind to
 bindto: "0.0.0.0:3000"
+# false : HTTP; true : HTTPS activated 
 https: true
+# full path of a file containing certificate + CA chain
 certfile: "/home/debian/fullchain.pem"
+# full path of a file containing private key
 keyfile: "/home/debian/privkey.pem"
+# the secret Token a client nedd to provide to use the server
 secret_token: "PVAfCf73k2G3XXnDP2qXNjnbh843DE/QVUYivoDzy6w="
+# stdout+stderr of the command will be sent from this address 
+# this email address is also used to authenticate to SMTP server
 email_from: "webhooklog@toto.com"
+# password to authenticate to SMTP server
 email_password: "azerty!6"
+# SMTP server FQDN
 email_smtpHost: "aaa.toto.com"
+# SMTP server port
 email_smtpPort: "587"
 
+# lists of projects, 4 lines by projects, start the first with a dash
+# route : part of the URI after FQDN , the server should respond to
+#         A good practice should be to use a complex 'route' to add security
+# nom : this string is passed as 1st argument to the command; do what you want wiht that !
+# command : full path of a command to execute
+# log_to_email : list of comma separated email address to send the command output and err to
 projets:
   - route: /projet-dev
-    nom: hook2cmd
+    name: hook2cmd
     command: "/home/debian/script/build-dev.sh" 
     log_to_email: "raphael.bordel@xxx.com,toto@titi.com"
   - route: /test
-    nom: projet
+    name: projet
     command: "/home/debian/script/test.sh"
     log_to_email: "raphael.bordel@xxx.com"
   - route: /projet-prod
-    nom: hook2cmd
+    name: hook2cmd
     command: "/home/debian/script/build-prod.sh"
     log_to_email: "toto@titi.com"
