@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -42,6 +43,7 @@ type Projet struct {
 // BUT don't know how to pass arguments to HandleFunc
 var yamlConfig Config
 var H2Clog *log.Logger
+var IPSem = make(map[string]*Weighted)
 
 func main() {
 	// if YAML config file can be loaded into global variable 'yamlConfig' 
@@ -57,6 +59,8 @@ func main() {
 
 		H2Clog = log.New(logFile, "", log.LstdFlags)
 		H2Clog.Println("Hook2CMD logging started ...")
+
+		go ticker()
 		
 		// we add a handler for each 'Route' for each 'Projets'
 		for _, uneconfig := range yamlConfig.Projets {
@@ -101,8 +105,16 @@ func chargeconfig() bool {
 // handle a connection  : can handle multiple connection ; this is called as a 'go routine'
 func hookHandler(w http.ResponseWriter, r *http.Request) {
 
-	//fmt.Printf("\n%s\n", r.Header) //r.RequestURI)
-	
+	//fmt.Printf("\n%s\n", r) //r.RequestURI)
+
+	// on traite ici le Rate Limiting
+	ip := trimIPFromPort(r.RemoteAddr)
+	if RateLimit(ip) == false {
+		http.Error(w, "Error : You have been Rate Limited\n", 503)
+		H2Clog.Println(ip, " : You have been Rate Limited")
+		return
+	}
+
 	// we look for GITLAB signature
 	if header_token1 := r.Header.Get("X-Gitlab-Token"); header_token1 != "" { 
 		if header_token1 != yamlConfig.SecretToken {
@@ -231,4 +243,83 @@ func SignedBy(signature string, payload []byte) bool {
 		calcule := SignBody(yamlConfig.SecretToken, payload)
 		return hmac.Equal(calcule, actual)
 	}
+}
+
+func trimIPFromPort(s string) string {
+    if idx := strings.LastIndex(s, ":"); idx != -1 {
+        return s[:idx]
+    }
+    return s
+}
+
+// RATE LIMITING FUNCTIONS
+
+// this function increment all 'Weighted'' elements of a map every 'tick'
+func ticker() {
+	c := time.Tick(5 * time.Second)
+	for {
+		<-c
+		for k, v := range IPSem {
+			v.Release(1, k)
+			//fmt.Printf("key[%s] value[%s]\n", k, v)
+		}
+	}
+}
+
+// Copyright 2017 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Package semaphore provides a weighted semaphore implementation.
+
+// Raphaël BORDEL implementation for Bucket Style Rate Limiting
+
+// NewWeighted creates a new weighted semaphore with the given
+// maximum combined weight for concurrent access.
+func NewWeighted(n int64) *Weighted {
+	w := &Weighted{size: n}
+	return w
+}
+
+// Weighted provides a way to bound concurrent access to a resource.
+// The callers can request access with a given weight.
+type Weighted struct {
+	size    int64
+	cur     int64
+	mu      sync.Mutex
+}
+
+// TryAcquire acquires the semaphore with a weight of n without blocking.
+// On success, returns true. On failure, returns false and leaves the semaphore unchanged.
+func (s *Weighted) TryAcquire(n int64) bool {
+	s.mu.Lock()
+	success := s.size-s.cur >= n 
+	if success {
+		s.cur += n
+	}
+	s.mu.Unlock()
+	return success
+}
+
+// Release releases the semaphore with a weight of n.
+func (s *Weighted) Release(n int64, ip string) {
+	s.mu.Lock()
+	s.cur -= n
+	if s.cur < 0 { // delete map element for wich no access from 'size' tick
+		delete(IPSem, ip)
+		s.mu.Unlock()
+		s = nil   // erase pointer for garbage collector
+	} else {
+		s.mu.Unlock()
+	}
+}
+
+func RateLimit(ip string) bool {
+
+	weight, ok := IPSem[ip]
+	if ok != true {  // the element does not exist in map
+		weight = NewWeighted(5)
+		IPSem[ip] = weight
+	}
+	return weight.TryAcquire(1)
 }
