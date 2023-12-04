@@ -257,10 +257,12 @@ var IPSem = make(map[string]*Weighted)
 
 func RateLimit(ip string) bool {
 	weight, ok := IPSem[ip]
-	if ok != true || weight == nil {  // the element does not exist in map OR is beeing deleted !
+	if ok != true {  // the element does not exist in map
 		weight = NewWeighted(5)
 		IPSem[ip] = weight
 	}
+	// I choose to ignore the fact that this map element could be being deleted
+	// no matter if weight is < 0
 	return weight.TryAcquire(1)
 }
 
@@ -272,10 +274,9 @@ func ticker() {
 		for k, v := range IPSem {
 			v.Release(1)
 			if v.cur < 0 {
-				IPSem[k] = nil		// for Garbage Collector ? FOR RateLimit test, YES !
 				delete(IPSem, k)	// delete map element for wich no access since 'size' tick
 			}
-			fmt.Printf("key[%s] value[%d]\n", k, v.cur)
+			//fmt.Printf("key[%s] value[%d]\n", k, v.cur)
 		}
 	}
 }
