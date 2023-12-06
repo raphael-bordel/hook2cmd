@@ -1,3 +1,4 @@
 #!/bin/bash
 echo "projet " $1
-#ls -la
+sleep 10
+echo "The END ..."

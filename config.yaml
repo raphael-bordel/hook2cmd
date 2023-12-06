@@ -29,7 +29,8 @@ email_smtpPort: "587"
 # lists of projects, 4 lines by projects, start the first with a dash
 # route : part of the URI after FQDN , the server should respond to
 #         A good practice should be to use a complex 'route' to add security
-# nom : this string is passed as 1st argument to the command; do what you want wiht that !
+# name : this string is passed as 1st argument to the command; do what you want wiht that !
+#        do not include '/' into 'name' string as it is used as a lock file name in /tmp
 # command : full path of a command to execute
 # log_to_email : list of comma separated email address to send the command output and err to
 projets:

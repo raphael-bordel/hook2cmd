@@ -175,7 +175,12 @@ func traite(route string) {
 }
 
 func runcommand(lp Projet) {
-	cmd := exec.Command(lp.Command, lp.Name)
+	flock_cmd := "/usr/bin/flock"
+	flock_arg1 := "-n"
+	flock_arg2 := "/tmp/" + lp.Name
+	flock_arg3 := "-c"
+	flock_arg4 := lp.Command + " " + lp.Name
+	cmd := exec.Command(flock_cmd, flock_arg1, flock_arg2, flock_arg3, flock_arg4)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		H2Clog.Println("cmd.CombinedOutput() failed with ", err)
