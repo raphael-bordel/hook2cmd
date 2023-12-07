@@ -109,7 +109,7 @@ func hookHandler(w http.ResponseWriter, r *http.Request) {
 	// on traite ici le Rate Limiting
 	ip := trimIPFromPort(r.RemoteAddr)
 	if RateLimit(ip) == false {
-		http.Error(w, "Error : You have been Rate Limited\n", 503)
+		http.Error(w, "Error : You have been Rate Limited\n", 429)
 		H2Clog.Println(ip, " : You have been Rate Limited")
 		return
 	}
@@ -177,17 +177,25 @@ func traite(route string) {
 func runcommand(lp Projet) {
 	flock_cmd := "/usr/bin/flock"
 	flock_arg1 := "-n"
+	flock_arg11 := "-E 222"
 	flock_arg2 := "/tmp/" + lp.Name
 	flock_arg3 := "-c"
 	flock_arg4 := lp.Command + " " + lp.Name
-	cmd := exec.Command(flock_cmd, flock_arg1, flock_arg2, flock_arg3, flock_arg4)
+	cmd := exec.Command(flock_cmd, flock_arg1, flock_arg11, flock_arg2, flock_arg3, flock_arg4)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		H2Clog.Println("cmd.CombinedOutput() failed with ", err)
-		return
+		H2Clog.Println("If exit status 222, a previous task ", lp.Name, " is still running")
+		out = append(out, "cmd.CombinedOutput() failed with "...)
+		out = append(out, err.Error()...)
+		out = append(out, "\r\n"...)
+		out = append(out, "If exit status 222, a previous task "...)
+		out = append(out, lp.Name...)
+		out = append(out, " is still running"...)
+	} else {
+		H2Clog.Println(lp.Route, lp.Command, lp.Name)
 	}
-	H2Clog.Println(lp.Route, lp.Command, lp.Name)
-	fmt.Printf("combined out:\n%s\n", string(out))
+	//fmt.Printf("combined out:\n%s\n", string(out))
 	envoimail(lp, out)
 }
 
