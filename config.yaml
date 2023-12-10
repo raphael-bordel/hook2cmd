@@ -16,6 +16,10 @@ certfile: "/home/debian/fullchain.pem"
 keyfile: "/home/debian/privkey.pem"
 # the secret Token a client nedd to provide to use the server
 secret_token: "PVAfCf73k2G3XXnDP2qXNjnbh843DE/QVUYivoDzy6w="
+# Use Hook2CMD internal Rate Limiter ?
+# the mecanism use HTTP request RemoteAddr : when the service Hook2Cmd is behind a proxy this
+# could lead to problems
+rate_limit: true
 # stdout+stderr of the command will be sent from this address 
 # this email address is also used to authenticate to SMTP server
 email_from: "webhooklog@toto.com"

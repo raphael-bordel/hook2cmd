@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/smtp"
 	"os"
@@ -25,6 +26,7 @@ type Config struct {
 	CertFile       string `yaml:"certfile"`
 	KeyFile        string `yaml:"keyfile"`
 	SecretToken    string `yaml:"secret_token"`
+	RateLimit      bool   `yaml:"rate_limit"`
 	Email_from     string `yaml:"email_from"`
 	Email_password string `yaml:"email_password"`
 	Email_smtpHost string `yaml:"email_smtpHost"`
@@ -107,43 +109,47 @@ func hookHandler(w http.ResponseWriter, r *http.Request) {
 	//fmt.Printf("\n%s\n", r) //r.RequestURI)
 
 	// on traite ici le Rate Limiting
-	ip := trimIPFromPort(r.RemoteAddr)
-	if RateLimit(ip) == false {
-		http.Error(w, "Error : You have been Rate Limited\n", 429)
-		H2Clog.Println(ip, " : You have been Rate Limited")
-		return
+	if yamlConfig.RateLimit == true {
+		// check IP format and get IP as [net.IPv6len]byte from net.parseIP() (!!!NOT ParseIP())
+		ip_str, _, iperr := net.SplitHostPort(r.RemoteAddr)
+		if iperr != nil {
+			h_error(w, "Error : Incorrect HTTP Request RemoteAddr\n", "ERROR : "+r.RemoteAddr+" : Incorrect HTTP Request RemoteAddr, Split", 429)
+			return
+		}
+		ip_B := net.ParseIP(ip_str)
+		if ip_B == nil {
+			h_error(w, "Error : Incorrect HTTP Request RemoteAddr\n", "ERROR : "+r.RemoteAddr+" : Incorrect HTTP Request RemoteAddr, Parse", 429)
+			return
+		}
+		if RateLimit(ip_B) == false {
+			h_error(w, "Error : You have been Rate Limited\n", "ERROR : "+ip_B.String()+" : You have been Rate Limited", 429)
+			//fmt.Printf("---% x---\n", ip)
+			return
+		}
 	}
 
 	// we look for GITLAB signature
 	if header_token1 := r.Header.Get("X-Gitlab-Token"); header_token1 != "" { 
 		if header_token1 != yamlConfig.SecretToken {
-			time.Sleep(8 * time.Second)  // wait 8 sec
-			http.Error(w, "Error : GitLab Token Verification Failed\n", 490)
-			H2Clog.Println("Bad Token in Gitlab WebHook request")
+			h_error(w, "Error : GitLab Token Verification Failed\n", "ERROR : Bad Token in Gitlab WebHook request", 490)
 			return
 		}
 	// we look for GITHUB signature
 	} else if header_token2 := r.Header.Get("X-Hub-Signature-256"); header_token2 != "" { 
 		payload, _ := ioutil.ReadAll(r.Body)
 		if SignedBy(header_token2, payload) != true {
-			time.Sleep(8 * time.Second)  // wait 8 sec to slow down hacking
-			http.Error(w, "Error : GitHub Token Verification Failed\n", 491)
-			H2Clog.Println("Bad Token in Github WebHook request")
+			h_error(w, "Error : GitHub Token Verification Failed\n", "ERROR : Bad Token in Github WebHook request", 491)
 			return
 		}
 	// we look for Hook2CMD signature
 	// exemple usage : curl -H "X-Hook2CMD-Token: PVAfCf73k2G3XXnDP2qXNjnbh843DE/QVUYivoDzy6w=" -X POST https://www.cresi.fr:3000/test
 	} else if header_token3 := r.Header.Get("X-Hook2CMD-Token"); header_token3 != "" { 
 		if header_token3 != yamlConfig.SecretToken {
-			time.Sleep(8 * time.Second)  // wait 8 sec to slow down hacking
-			http.Error(w, "Error : Hook2CMD Token Verification Failed\n", 492)
-			H2Clog.Println("Bad Token in Hook2CMD request")
+			h_error(w, "Error : Hook2CMD Token Verification Failed\n", "ERROR : Bad Token in Hook2CMD request", 492)
 			return
 		}
 	} else {
-		time.Sleep(8 * time.Second)  // wait 8 sec to slow down hacking
-		http.Error(w, "Error : Unidentified WebHook request\n", 497)
-		H2Clog.Println("Unidentified WebHook request")
+		h_error(w, "Error : Unidentified WebHook request\n", "ERROR : Unidentified WebHook request", 497)
 		return
 	}
 	http.Error(w, "ok\n", 200)
@@ -151,6 +157,13 @@ func hookHandler(w http.ResponseWriter, r *http.Request) {
 	go traite(r.RequestURI)
 
 	return
+}
+
+// common Handler error func
+func h_error(w http.ResponseWriter, e_http string, e_log string, e_code int) {
+	time.Sleep(8 * time.Second)  // wait 8 sec to slow down hacking
+	http.Error(w, e_http, e_code)
+	H2Clog.Println(e_log)
 }
 
 // look for Projet associated with the 'Route' 
@@ -167,7 +180,7 @@ func traite(route string) {
 		}
 	}
 	if ok != true {
-		H2Clog.Println("No Projet for this Route in config file: ", route)
+		H2Clog.Println("ERROR : No Projet for this Route in config file: ", route)
 		return
 	}
 
@@ -193,7 +206,7 @@ func runcommand(lp Projet) {
 		out = append(out, lp.Name...)
 		out = append(out, " is still running"...)
 	} else {
-		H2Clog.Println(lp.Route, lp.Command, lp.Name)
+		H2Clog.Println("OK : ", lp.Route, lp.Command, lp.Name)
 	}
 	//fmt.Printf("combined out:\n%s\n", string(out))
 	envoimail(lp, out)
@@ -257,22 +270,16 @@ func SignedBy(signature string, payload []byte) bool {
 	}
 }
 
-func trimIPFromPort(s string) string {
-    if idx := strings.LastIndex(s, ":"); idx != -1 {
-        return s[:idx]
-    }
-    return s
-}
-
 // RATE LIMITING FUNCTIONS
 
-var IPSem = make(map[string]*Weighted)
+var IPSem = make(map[[net.IPv6len]byte]*Weighted)
 
-func RateLimit(ip string) bool {
-	weight, ok := IPSem[ip]
+func RateLimit(ip_B net.IP) bool {
+	ip_B16 := [net.IPv6len]byte(ip_B)
+	weight, ok := IPSem[ip_B16]
 	if ok != true {  // the element does not exist in map
 		weight = NewWeighted(5)
-		IPSem[ip] = weight
+		IPSem[ip_B16] = weight
 	}
 	// I choose to ignore the fact that this map element could be being deleted
 	// no matter if weight is < 0
