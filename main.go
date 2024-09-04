@@ -14,8 +14,10 @@ import (
 	"net/smtp"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -60,6 +62,10 @@ func main() {
 
 		H2Clog = log.New(logFile, "", log.LstdFlags)
 		H2Clog.Println("Hook2CMD logging started ...")
+
+		sigc := make(chan os.Signal, 1)
+		signal.Notify(sigc)
+		go signalcatcher(sigc, logFile)
 
 		go ticker()
 		
@@ -110,7 +116,7 @@ func hookHandler(w http.ResponseWriter, r *http.Request) {
 
 	// on traite ici le Rate Limiting
 	if yamlConfig.RateLimit == true {
-		// check IP format and get IP as [net.IPv6len]byte from net.parseIP() (!!!NOT ParseIP())
+		// check IP format and get IP as net.IP
 		ip_str, _, iperr := net.SplitHostPort(r.RemoteAddr)
 		if iperr != nil {
 			h_error(w, "Error : Incorrect HTTP Request RemoteAddr\n", "ERROR : "+r.RemoteAddr+" : Incorrect HTTP Request RemoteAddr, Split", 429)
@@ -341,4 +347,19 @@ func (s *Weighted) Release(n int64) {
 	s.mu.Lock()
 	s.cur -= n
 	s.mu.Unlock()
+}
+
+// this fucntion catch signals received by the process
+func signalcatcher(sigc <-chan os.Signal, logFile *os.File) {
+	for {
+		s := <-sigc
+		switch s {
+		case syscall.SIGTERM:
+			H2Clog.Println("SIGTERM received : terminating")
+			logFile.Close()
+			os.Exit(3)
+		default:
+			H2Clog.Println("Ignore Signal:", s)
+		}
+	}
 }
